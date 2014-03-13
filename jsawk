@@ -1,29 +1,22 @@
-#!/usr/bin/env bash
+#!/usr/bin/env node
+//
+// Jsawk: It's like awk for JSON, in bash.
+//
+// Fork me on github:
+//   http://github.com/micha/jsawk
+//
+// Author:
+//   Micha Niskin <micha@thinkminimo.com>
+//   Copyright 2009, no rights reserved, other than as required by the
+//   licenses of the incorporated software below.
+//
 
-#
-# Jsawk: It's like awk for JSON, in bash.
-#
-# Fork me on github:
-#   http://github.com/micha/jsawk
-#
-# Author:
-#   Micha Niskin <micha@thinkminimo.com>
-#   Copyright 2009, no rights reserved, other than as required by the
-#   licenses of the incorporated software below.
-#
+options = require(process.env['HOME'] + '/.jsawkrc')
 
-TMP1=`mktemp /tmp/tmp.XXXXXX`
-TMP2=`mktemp /tmp/tmp.XXXXXX`
-
-trap "rm -f $TMP1 $TMP2" SIGINT SIGTERM SIGHUP SIGQUIT
-
-cat <<'__END__' > $TMP1
-
-window    = this;     // the global object
-window.IS = [];       // the input set
-window.RS = [];       // the result set
-window.$_ = {};       // the current element index
-window.$$ = {};       // the current element
+global.IS = [];       // the input set
+global.RS = [];       // the result set
+global.$_ = {};       // the current element index
+global.$$ = {};       // the current element
 
 
 /**
@@ -412,7 +405,7 @@ You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2
     }
     return outArr;
   }
-  window.uniq = function(array) {
+  global.uniq = function(array) {
     return distinctFilter(array, function() { return true; });
   };
   var JSONQuery = function(/*String*/query,/*Object?*/obj){
@@ -595,7 +588,7 @@ You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2
   	namespace("json::JSONQuery", JSONQuery);
   }
   else {
-  	window["JSONQuery"] = JSONQuery;
+  	global["JSONQuery"] = JSONQuery;
   }
 })();
 
@@ -1096,28 +1089,28 @@ replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
       doPrint(type, ret);
     }
   };
-  window.Q = function() {
+  global.Q = function() {
     try {
-      var ret = JSONQuery.apply(window, arguments);
+      var ret = JSONQuery.apply(global, arguments);
       ret.length;
       return ret;
     } catch (e) {
       err("jsawk: JSONQuery parse error: '"+arguments[0]+"'");
-      quit(4);
+      process.exit(4);
     }
   };
-  window.out = function() {
+  global.out = function() {
     var args  = Array.prototype.slice.call(arguments);
     args.unshift("OUT:");
-    doJsonPrint.apply(window, args);
+    doJsonPrint.apply(global, args);
   };
-  window.err = function() {
+  global.err = function() {
     var args  = Array.prototype.slice.call(arguments);
     args.unshift("ERR:");
-    doJsonPrint.apply(window, args);
+    doJsonPrint.apply(global, args);
   };
-  window.alert = p;
-  window.doJson = function(input) {
+  global.alert = p;
+  global.doJson = function(input) {
     if (typeof input !== "string") {
       return input;
     } else {
@@ -1129,53 +1122,53 @@ replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
           return eval("("+input+")");
         } catch (e) {
           err("jsawk: JSON parse error: '"+input+"'");
-          quit(2);
+          process.exit(2);
         }
       }
     }
   };
-  window.doCall = function(fun, obj) {
+  global.doCall = function(fun, obj) {
     try {
       return fun.call(obj);
     } catch (e) {
       err("jsawk: js error: "+e);
-      quit(3);
+      process.exit(3);
     }
   };
-  window.makeFilter = function(fun) {
+  global.makeFilter = function(fun) {
     try {
       return eval("(function() { "+fun+"; return this })");
     } catch (e) {
       err("jsawk: script parse error: '"+fun+"'");
-      quit(3);
+      process.exit(3);
     }
   };
-  window.json = function() {
+  global.json = function() {
     try {
-      return JSON.stringify.apply(window, arguments);
+      return JSON.stringify.apply(global, arguments);
     } catch (e) {
       err("jsawk: JSON stringify error: "+e);
-      quit(5);
+      process.exit(5);
     }
   };
-  window.get = function() {
+  global.get = function() {
     return $$ = IS[++$_];
   };
-  window.put = function(record) {
+  global.put = function(record) {
     IS = IS.slice(0, $_+1).concat([record]).concat(IS.slice($_+1));
   };
-  window.forEach = function(ary, fun) {
+  global.forEach = function(ary, fun) {
     fun = eval("function(index,item) { "+fun+"; }");
     for (var i=0; i<ary.length; i++) {
       try {
         fun.call(ary[i], i, ary[i]);
       } catch (e) {
         err("jsawk: js error: "+e);
-        quit(3);
+        process.exit(3);
       }
     }
   };
-})(window.print);
+})(console.log);
 
 (function(argv) {
   argv = Array.prototype.slice.call(argv);
@@ -1185,7 +1178,7 @@ replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
   var usage = function() {
     err("Usage: jsawk [-n] [-j jsbin] [-f jsfile1.js]* [-q jsonquery] \\\n" +
         "             [-b script] [-a script] [-v NAME=VALUE] [script]");
-    quit(1);
+    process.exit(1);
   };
 
   var fun = "";
@@ -1230,7 +1223,7 @@ replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
         var tmp = argv.shift();
         var key = tmp.replace(/=.*$/, "");
         var val = tmp.replace(/^[^=]+=/, "");
-        window[key] = val;
+        global[key] = val;
         break;
       default:
         fun = arg;
@@ -1239,89 +1232,51 @@ replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
 
   var input="";
 
-  for (var i=0; i<inputLines; i++) {
-    var line=readline();  
-    input += (line ? line : "");  
-    input += "\n";  
-  }  
+  process.stdin.on('data', function(data) {
+	input += data
+  })
 
   var wrapped;
+ 
+  process.stdin.on('close', function() {
+	 IS      = doJson(input);
+	 wrapped = !(IS instanceof Array);
 
-  IS      = doJson(input);
-  wrapped = !(IS instanceof Array);
+	  if (wrapped)
+	    IS = [ IS ];
 
-  if (wrapped)
-    IS = [ IS ];
+	  for (i in libs)
+	    load(libs[i]);
 
-  for (i in libs)
-    load(libs[i]);
+	  var f = makeFilter(fun);
 
-  var f = makeFilter(fun);
+	  for (i in queries)
+	    IS = Q(queries[i], IS);
 
-  for (i in queries)
-    IS = Q(queries[i], IS);
+	  $_ = -1;
+	  $$ = IS;
 
-  $_ = -1;
-  $$ = IS;
+	  for (i in befores)
+	    IS = doCall(befores[i], IS);
 
-  for (i in befores)
-    IS = doCall(befores[i], IS);
+	  RS = [];
 
-  RS = [];
+	  for ($_=0; $_<IS.length; $_++) {
+	    $$ = IS[$_]
+	    var tmp = doCall(f, $$);
+	    if (tmp != null) RS.push(tmp);
+	  }
 
-  for ($_=0; $_<IS.length; $_++) {
-    $$ = IS[$_]
-    var tmp = doCall(f, $$);
-    if (tmp != null) RS.push(tmp);
-  }
+	  $_ = -1;
+	  $$ = RS;
 
-  $_ = -1;
-  $$ = RS;
+	  for (i in afters)
+	    RS = doCall(afters[i], RS);
 
-  for (i in afters)
-    RS = doCall(afters[i], RS);
+	  if (wrapped)
+	    RS = RS.pop();
 
-  if (wrapped)
-    RS = RS.pop();
-
-  if (!noprint)
-    out(RS);
-})(typeof arguments === 'undefined' ? scriptArgs : arguments);
-__END__
-
-nlines=0
-get_lines="yes"
-
-while getopts :hnj:q:f:b:a:v: opt; do
-  case $opt in
-    h) get_lines="no" ;;
-    j) js_arg=$OPTARG ;;
-  esac
-done
-
-if [ $get_lines != "no" ]; then
-  echo "$(cat 2>/dev/null)" > $TMP2
-  nlines=$(grep -c '$' $TMP2 2>/dev/null || echo 0)
-fi
-
-if [ -e /etc/jsawkrc ]; then
-  . /etc/jsawkrc
-fi
-
-if [ -e ~/.jsawkrc ]; then
-  . ~/.jsawkrc
-fi
-
-JSBIN=${js_arg:-${JS:-js}}
-
-ret=$?
-res=$(cat $TMP2 2>/dev/null | $JSBIN $TMP1 $nlines "$@")
-out=$(echo "$res" |sed '/^OUT: /s/^.....//p;d')
-err=$(echo "$res" |sed '/^ERR: /s/^.....//p;d')
-
-[ -n "$err" ] && echo "$err" 1>&2
-[ -n "$out" ] && echo "$out"
-
-rm -f $TMP1 $TMP2
-
-exit $ret
+	  if (!noprint)
+	    out(RS);
+ 	})
+})(process.argv)
