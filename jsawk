@@ -920,7 +920,7 @@ replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
   };
   global.out = function() {
     var args  = Array.prototype.slice.call(arguments);
-    //args.unshift("OUT: ")
+    args.unshift("")
     doJsonPrint.apply(global, args);
   };
   global.err = function() {
